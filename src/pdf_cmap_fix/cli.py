@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 from typing import Sequence
 
+import fitz
+
 from pdf_cmap_fix import __version__
 from pdf_cmap_fix.cache import MappingCache
 from pdf_cmap_fix.cmap import generate_tounicode_cmap, sanitize_cmap_name
@@ -25,6 +27,90 @@ def _collect_pdfs(target: Path) -> list[Path]:
     return []
 
 
+def _parse_page_spec(spec: str | None, total_pages: int) -> list[int]:
+    """Parse 1-based page specification like '1,3-5' into 0-based page indices."""
+    if not spec:
+        return list(range(total_pages))
+    indices: set[int] = set()
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            s_str, e_str = part.split("-", 1)
+            start = max(1, int(s_str))
+            end = min(total_pages, int(e_str)) if e_str.strip() else total_pages
+            for p in range(start, end + 1):
+                indices.add(p - 1)
+        else:
+            p = int(part)
+            if 1 <= p <= total_pages:
+                indices.add(p - 1)
+    return sorted(indices)
+
+
+def _cmd_extract(args: argparse.Namespace) -> int:
+    src = Path(args.input)
+    if not src.exists() or not src.is_file():
+        print(f"Error: PDF file not found: {src}", file=sys.stderr)
+        return 1
+
+    doc = fitz.open(src)
+    cmp_doc = None
+    try:
+        if args.compare:
+            cmp_path = Path(args.compare)
+            if not cmp_path.exists() or not cmp_path.is_file():
+                print(f"Error: comparison PDF not found: {cmp_path}", file=sys.stderr)
+                return 1
+            cmp_doc = fitz.open(cmp_path)
+
+        pages = _parse_page_spec(args.pages, len(doc))
+        if args.json:
+            payload = []
+            for pi in pages:
+                entry = {"page": pi + 1, "text": doc[pi].get_text("text")}
+                if cmp_doc is not None and pi < len(cmp_doc):
+                    entry["compare_text"] = cmp_doc[pi].get_text("text")
+                payload.append(entry)
+            out_str = json.dumps(payload, ensure_ascii=False, indent=2)
+        elif cmp_doc is not None:
+            chunks: list[str] = []
+            for pi in pages:
+                before_lines = [ln.strip() for ln in doc[pi].get_text("text").splitlines() if ln.strip()]
+                after_lines = (
+                    [ln.strip() for ln in cmp_doc[pi].get_text("text").splitlines() if ln.strip()]
+                    if pi < len(cmp_doc)
+                    else []
+                )
+                chunks.append(f"=== Page {pi + 1} ===")
+                chunks.append("[BEFORE]")
+                chunks.extend(f"  {ln}" for ln in before_lines[: args.max_lines])
+                chunks.append("[AFTER]")
+                chunks.extend(f"  {ln}" for ln in after_lines[: args.max_lines])
+            out_str = "\n".join(chunks)
+        else:
+            chunks = []
+            for pi in pages:
+                if len(pages) > 1:
+                    chunks.append(f"=== Page {pi + 1} ===")
+                txt = doc[pi].get_text("text").strip()
+                if args.max_lines > 0:
+                    txt = "\n".join(txt.splitlines()[: args.max_lines])
+                chunks.append(txt)
+            out_str = "\n\n".join(chunks)
+
+        if args.output:
+            out_p = Path(args.output)
+            out_p.parent.mkdir(parents=True, exist_ok=True)
+            out_p.write_text(out_str + "\n", encoding="utf-8")
+        else:
+            print(out_str)
+        return 0
+    finally:
+        doc.close()
+        if cmp_doc is not None:
+            cmp_doc.close()
 def _parse_cid(raw: str) -> int:
     s = raw.strip()
     if s.lower().startswith("0x"):
@@ -429,6 +515,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_fix.add_argument("--debug-dir", help="Optional directory to dump rendered PNGs and generated .cmap files")
     p_fix.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
 
+    # extract
+    p_ext = subparsers.add_parser(
+        "extract",
+        help="Extract UTF-8 text/JSON from a PDF or compare BEFORE vs AFTER repair side-by-side",
+    )
+    p_ext.add_argument("input", help="Input PDF file")
+    p_ext.add_argument("--compare", help="Second (repaired) PDF file to compare BEFORE vs AFTER")
+    p_ext.add_argument("--pages", help="1-based page range, e.g. '1,3-5' (default: all pages)")
+    p_ext.add_argument("--max-lines", type=int, default=20, help="Max lines per page in preview/compare (0 = unlimited)")
+    p_ext.add_argument("-o", "--output", help="Write output to file instead of stdout")
+    p_ext.add_argument("--json", action="store_true", help="Output structured JSON per page (for RAG pipelines)")
+
     # cache
     p_cache = subparsers.add_parser("cache", help="Inspect, migrate, compact, and export CID->Unicode caches")
     cache_sub = p_cache.add_subparsers(dest="cache_command", required=True)
@@ -522,6 +620,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _cmd_check(args)
     if args.command == "fix":
         return _cmd_fix(args)
+    if args.command == "extract":
+        return _cmd_extract(args)
     if args.command == "cache":
         return _cmd_cache(args)
     return 1

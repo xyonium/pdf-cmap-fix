@@ -24,6 +24,7 @@ _OCR_PROMPT = (
 )
 _WHITESPACE_RE = re.compile(r"\s+")
 _COMMON_LIGATURES = frozenset({"fi", "fl", "ff", "ffi", "ffl", "ft", "st", "tt", "ti", "ij", "IJ", "ae", "oe"})
+_F_LIGATURES_ORDERED = ("ffi", "ffl", "ff", "fi", "fl")
 
 
 class OCRConfigError(RuntimeError):
@@ -325,6 +326,27 @@ def align_cids_with_ocr(
 
             if aligned:
                 return aligned
+
+    # Unanchored unique f-ligature folding (e.g. "June 2016, ScientificAmerican.com" where "fi" is 1 CID)
+    if n_clu > n_cids and 1 <= (n_clu - n_cids) <= 4:
+        folded: list[str] = []
+        idx = 0
+        while idx < n_clu:
+            matched_lig = None
+            for lig in _F_LIGATURES_ORDERED:
+                k = len(lig)
+                if idx + k <= n_clu and "".join(clusters[idx : idx + k]) == lig:
+                    matched_lig = lig
+                    break
+            if matched_lig is not None:
+                folded.append(matched_lig)
+                idx += len(matched_lig)
+            else:
+                folded.append(clusters[idx])
+                idx += 1
+        # Only accept if folding all f-ligatures reaches the exact CID count (unambiguous!)
+        if len(folded) == n_cids:
+            return [(real_cids[i], folded[i]) for i in range(n_cids)]
 
     # Safe fallback ONLY when lengths still differ and both sides have leading runs of repeated tokens
     if n_cids >= 2 and n_clu >= 2 and real_cids[0] == real_cids[1] and clusters[0] == clusters[1]:

@@ -150,11 +150,24 @@ def generate_tounicode_cmap(
 
 
 def _expand_bfrange_target(start_cid: int, end_cid: int, dst_hex: str) -> dict[int, str]:
-    """Expand `<start> <end> <dst>` following ISO 32000-1 §9.10.3 last-byte-only increment."""
-    raw = bytearray(bytes.fromhex(dst_hex))
-    if len(raw) < 2 or len(raw) % 2 != 0:
-        raise ValueError(f"Invalid UTF-16BE bfrange destination: <{dst_hex}>")
+    """Expand `<start> <end> <dst>`.
+
+    For valid ISO 32000-1 ranges (`last_byte + offset <= 0xFF`), scalar increment and
+    last-byte increment are identical. When parsing a legacy broken CMap that overflowed
+    `0xFF` (e.g. `<2D08> <2D09> <51FF>`), incrementing the Unicode scalar recovers the
+    original author's intended codepoint (`U+5200` '刀') instead of wrapping to `U+5100` ('儀').
+    """
+    start_text = decode_unicode_hex(dst_hex)
     result: dict[int, str] = {}
+    if len(start_text) == 1:
+        base_cp = ord(start_text)
+        for offset, cid in enumerate(range(start_cid, end_cid + 1)):
+            cp = base_cp + offset
+            if 0 < cp <= 0x10FFFF and not (0xD800 <= cp <= 0xDFFF):
+                result[cid] = chr(cp)
+        return result
+
+    raw = bytearray(bytes.fromhex(dst_hex))
     base_last = raw[-1]
     for offset, cid in enumerate(range(start_cid, end_cid + 1)):
         cur_last = (base_last + offset) & 0xFF

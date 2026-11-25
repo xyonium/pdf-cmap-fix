@@ -63,3 +63,23 @@ def test_cli_cache_verify_help_and_missing_path_handling(tmp_path: Path):
     pdf_path, _ = make_embedded_type0_pdf(tmp_path / "sample.pdf", text="AB", tounicode_mode="strip")
     # All cached entries already locked -> exits 0 cleanly without needing API key!
     assert main(["cache", "verify", str(cache_path), "--pdfs", str(pdf_path)]) == 0
+
+
+def test_cli_extract_and_sdk_exports(tmp_path: Path, capsys):
+    import pdf_cmap_fix
+
+    for attr in ("inspect_pdf", "fix_pdf", "FixOptions", "MappingCache", "verify_cache_with_pdfs"):
+        assert hasattr(pdf_cmap_fix, attr)
+
+    missing_pdf, cids = make_embedded_type0_pdf(tmp_path / "before.pdf", text="AB", tounicode_mode="strip")
+    cmap = generate_tounicode_cmap({cids[0]: "A", cids[1]: "B"}).encode("ascii")
+    ok_pdf, _ = make_embedded_type0_pdf(tmp_path / "after.pdf", text="AB", tounicode_mode="custom", custom_tounicode=cmap)
+
+    capsys.readouterr()
+    assert main(["extract", str(ok_pdf), "--pages", "1"]) == 0
+    out_txt = capsys.readouterr().out
+    assert "AB" in out_txt
+
+    assert main(["extract", str(missing_pdf), "--compare", str(ok_pdf), "--pages", "1"]) == 0
+    cmp_out = capsys.readouterr().out
+    assert "BEFORE" in cmp_out and "AFTER" in cmp_out and "AB" in cmp_out

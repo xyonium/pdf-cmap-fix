@@ -93,6 +93,16 @@ def test_align_cids_mismatch_without_anchors_returns_empty_not_shifted():
     assert align_cids_with_ocr([1, 2, 3], "ab") == []
 
 
+def test_align_cids_unanchored_auto_folds_unique_f_ligatures():
+    # "Sci" + "fi" (1 CID=99) + "c" -> 5 CIDs vs 6 OCR chars "Scific", no anchors yet!
+    cids = [10, 20, 30, 99, 40]
+    pairs = align_cids_with_ocr(cids, "Scific")
+    assert pairs == [(10, "S"), (20, "c"), (30, "i"), (99, "fi"), (40, "c")]
+
+    # Ambiguous: two "fi" in OCR ("fifi") but only 3 CIDs (1 ligature + 1 split) -> ambiguous, returns []
+    assert align_cids_with_ocr([1, 2, 3], "fifi") == []
+
+
 def test_align_cids_equal_length_respects_multichar_anchor_and_skips_ambiguous_chains():
     # Even though len([10, 20, 30]) == len("fiX") == 3, anchor 10 -> "fi" MUST NOT be split into ('f','i')!
     pairs = align_cids_with_ocr([10, 20, 30], "fiX", known_anchors={10: "fi", 30: "X"})

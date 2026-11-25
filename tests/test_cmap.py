@@ -132,6 +132,10 @@ end
     assert any("high-byte" in e or "first-byte" in e for e in errors)
     assert any("last-byte" in e or "0xFF" in e for e in errors)
     assert any("CMapName currentdict" in e for e in errors)
+    # Parsing a legacy overflowed bfrange (<2D08> <2D09> <51FF>) recovers intended U+5200 (not wrapped U+5100)
+    parsed = parse_tounicode_cmap(bad_cmap)
+    assert parsed[0x2D08] == "\u51ff"
+    assert parsed[0x2D09] == "\u5200"
 
 
 def test_sanitize_cmap_name_strips_pdf_delimiters():
