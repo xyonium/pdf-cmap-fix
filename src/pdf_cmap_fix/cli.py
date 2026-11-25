@@ -14,6 +14,7 @@ from pdf_cmap_fix.cmap import generate_tounicode_cmap, sanitize_cmap_name
 from pdf_cmap_fix.detector import inspect_pdf
 from pdf_cmap_fix.ocr import resolve_ocr_config
 from pdf_cmap_fix.patcher import FixOptions, fix_pdf
+from pdf_cmap_fix.verifier import VerifyOptions, verify_cache_with_pdfs
 
 
 def _collect_pdfs(target: Path) -> list[Path]:
@@ -287,6 +288,91 @@ def _cmd_cache(args: argparse.Namespace) -> int:
         print(f"Exported {count} ToUnicode CMap file(s) to {out_dir}")
         return 0
 
+    if sub == "verify":
+        cache_path = Path(args.cache)
+        if not cache_path.exists():
+            print(f"Error: cache not found: {cache_path}", file=sys.stderr)
+            return 1
+        pdfs: list[Path] = []
+        for raw_p in args.pdfs:
+            p = Path(raw_p)
+            if not p.exists():
+                print(f"Error: PDF path not found: {p}", file=sys.stderr)
+                return 1
+            pdfs.extend(_collect_pdfs(p))
+        pdfs = sorted(dict.fromkeys(pdfs))
+        if not pdfs:
+            print("Error: no PDF files found to render glyphs from", file=sys.stderr)
+            return 1
+
+        primary_cfg = resolve_ocr_config(
+            api_key=args.api_key,
+            base_url=args.base_url,
+            model=args.model,
+            concurrency=args.concurrency,
+            max_retries=args.max_retries,
+        )
+        referee_cfg = None
+        if args.referee_model:
+            referee_cfg = resolve_ocr_config(
+                api_key=args.referee_api_key or args.api_key,
+                base_url=args.referee_base_url or args.base_url,
+                model=args.referee_model,
+                concurrency=args.concurrency,
+                max_retries=args.max_retries,
+            )
+
+        opts = VerifyOptions(
+            fonts=tuple(args.font) if args.font else (),
+            rows=args.rows,
+            cols=args.cols,
+            cell_size=args.cell_size,
+            reverify_locked=args.reverify_locked,
+            conflicts_only=args.conflicts_only,
+            auto_fix=args.auto_fix,
+            concurrency=args.concurrency,
+            ocr_config=primary_cfg,
+            referee_config=referee_cfg,
+            report_path=Path(args.report) if args.report else None,
+            debug_dir=Path(args.debug_dir) if args.debug_dir else None,
+            max_sheets=args.max_sheets,
+            verbose=args.verbose,
+        )
+        summary = verify_cache_with_pdfs(cache_path, pdfs, opts)
+        if args.json:
+            print(json.dumps(summary.to_dict(), ensure_ascii=False, indent=2))
+        else:
+            print(
+                f"Verify summary: candidates={summary.total_candidates}, "
+                f"already_locked={summary.skipped_already_locked}, "
+                f"not_in_pdfs={summary.skipped_not_in_pdfs}, "
+                f"blank_locked={summary.blank_verified}, "
+                f"verified_locked={summary.verified_locked}, "
+                f"referee_confirmed={summary.referee_confirmed_cache}, "
+                f"auto_fixed={summary.auto_fixed}, "
+                f"unresolved={summary.unresolved_mismatches}, "
+                f"sheets={summary.sheets_processed}+{summary.referee_sheets_processed}"
+            )
+            if summary.corrections:
+                print(f"Auto-fixed {len(summary.corrections)} entry(ies):")
+                for corr in summary.corrections[:30]:
+                    print(
+                        f"  {corr['font']} CID {corr['cid']} ({corr['cid_hex']}): "
+                        f"{corr['old']!r} -> {corr['new']!r} ({corr['reason']})"
+                    )
+            if summary.unresolved:
+                print(f"Unresolved {len(summary.unresolved)} entry(ies) (left unlocked):")
+                for item in summary.unresolved[:30]:
+                    print(
+                        f"  {item['font']} CID {item['cid']} ({item['cid_hex']}): "
+                        f"cached={item['cached']!r} primary={item['primary']!r} "
+                        f"referee={item['referee']!r} ({item['reason']})"
+                    )
+            if summary.error:
+                print(f"Error: {summary.error}", file=sys.stderr)
+                return 1
+        return 0 if summary.error is None else 1
+
     return 1
 
 
@@ -379,6 +465,42 @@ def build_parser() -> argparse.ArgumentParser:
     pc_exp.add_argument("cache", help="Cache JSON path")
     pc_exp.add_argument("-o", "--output", required=True, help="Output directory")
     pc_exp.add_argument("--bfrange", action="store_true")
+
+    pc_ver = cache_sub.add_parser(
+        "verify",
+        help="Render cached glyphs into numbered contact sheets and visually verify/lock via VLM",
+    )
+    pc_ver.add_argument("cache", help="Cache JSON path (updated atomically with verified locks)")
+    pc_ver.add_argument(
+        "--pdfs",
+        nargs="+",
+        required=True,
+        help="One or more PDF files or directories providing embedded vector fonts",
+    )
+    pc_ver.add_argument("--font", action="append", help="Limit verification to specific simplified font(s)")
+    pc_ver.add_argument("--rows", type=int, default=10, help="Rows per contact sheet (default: 10)")
+    pc_ver.add_argument("--cols", type=int, default=10, help="Columns per contact sheet (default: 10)")
+    pc_ver.add_argument("--cell-size", type=int, default=84, help="Glyph cell size in px (default: 84)")
+    pc_ver.add_argument("--reverify-locked", action="store_true", help="Also re-verify entries already marked locked")
+    pc_ver.add_argument("--conflicts-only", action="store_true", help="Only verify multi-candidate entries")
+    pc_ver.add_argument(
+        "--auto-fix",
+        action="store_true",
+        help="Update & lock mismatches when primary and referee models unanimously agree",
+    )
+    pc_ver.add_argument("--concurrency", type=int, default=4, help="Concurrent VLM sheet requests (default: 4)")
+    pc_ver.add_argument("--max-retries", type=int, default=6)
+    pc_ver.add_argument("--max-sheets", type=int, default=0, help="Cap number of Stage 1 sheets (0 = unlimited)")
+    pc_ver.add_argument("--api-key", help="Primary VLM API key (or PDF_CMAP_API_KEY / DASHSCOPE_API_KEY)")
+    pc_ver.add_argument("--base-url", help="Primary VLM base URL")
+    pc_ver.add_argument("--model", help="Primary VLM model ID (or PDF_CMAP_MODEL)")
+    pc_ver.add_argument("--referee-model", help="Optional 2nd VLM model ID for cross-checking mismatches")
+    pc_ver.add_argument("--referee-api-key", help="Optional API key override for referee model")
+    pc_ver.add_argument("--referee-base-url", help="Optional base URL override for referee model")
+    pc_ver.add_argument("--report", help="Write detailed JSON audit report to this path")
+    pc_ver.add_argument("--debug-dir", help="Dump rendered contact sheet PNGs to this directory")
+    pc_ver.add_argument("--json", action="store_true", help="Print JSON summary to stdout")
+    pc_ver.add_argument("-v", "--verbose", action="store_true", help="Print per-sheet progress")
 
     return parser
 

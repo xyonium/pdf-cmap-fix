@@ -406,8 +406,9 @@ class OpenAIVisionOCR:
                 timeout=config.timeout,
             )
 
-    def recognize(self, image: Image.Image) -> str:
+    def recognize(self, image: Image.Image, *, prompt: str | None = None) -> str:
         b64 = image_to_base64_png(image)
+        use_prompt = prompt or _OCR_PROMPT
         last_err: Exception | None = None
 
         for attempt in range(self.config.max_retries):
@@ -423,7 +424,7 @@ class OpenAIVisionOCR:
                                     "type": "image_url",
                                     "image_url": {"url": f"data:image/png;base64,{b64}"},
                                 },
-                                {"type": "text", "text": _OCR_PROMPT},
+                                {"type": "text", "text": use_prompt},
                             ],
                         }
                     ],

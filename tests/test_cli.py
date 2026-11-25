@@ -52,3 +52,14 @@ def test_cli_fix_in_place_and_cache_subcommands(tmp_path: Path, capsys):
     # In-place fix using migrated cache (zero OCR needed)
     assert main(["fix", str(missing_pdf), "--in-place", "--cache", str(v2_path), "--if-needed"]) == 0
     assert main(["check", str(missing_pdf)]) == 0
+
+
+def test_cli_cache_verify_help_and_missing_path_handling(tmp_path: Path):
+    assert main(["cache", "verify", str(tmp_path / "missing.json"), "--pdfs", str(tmp_path)]) == 1
+    cache_path = tmp_path / "c.json"
+    c = MappingCache()
+    c.set_mapping("SourceHanSansCN", 10, "A", lock=True)
+    c.save(cache_path)
+    pdf_path, _ = make_embedded_type0_pdf(tmp_path / "sample.pdf", text="AB", tounicode_mode="strip")
+    # All cached entries already locked -> exits 0 cleanly without needing API key!
+    assert main(["cache", "verify", str(cache_path), "--pdfs", str(pdf_path)]) == 0

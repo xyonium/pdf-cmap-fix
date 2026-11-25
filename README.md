@@ -123,6 +123,15 @@ uv run pdf-cmap-fix cache set ./data/cmap_cache.json SourceHanSansCN 32 "?"
 # 将高置信条目提升为 locked 并按比例封顶超大计数（不丢弃低频候选记录）
 uv run pdf-cmap-fix cache compact ./data/cmap_cache.json
 
+# 批量视觉核验缓存并真正锁定（将嵌入矢量字形按 10x10 编号网格重渲染，用大模型盲读校验；可配双模型裁判自动修正错误）
+uv run pdf-cmap-fix cache verify ./data/cmap_cache.json \
+  --pdfs ./issues/ \
+  --font SourceHanSansCN --font SourceHanSerifCN \
+  --model qwen3.8-max-0902 \
+  --referee-model kimi-k3.1-pro \
+  --auto-fix \
+  --report ./data/verify_report.json
+
 # 导出各字体的标准 .cmap 文件供人工审查或离线复用
 uv run pdf-cmap-fix cache export-cmap ./data/cmap_cache.json -o ./exported_cmaps
 ```
