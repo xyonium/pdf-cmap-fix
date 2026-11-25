@@ -15,7 +15,7 @@ import fitz
 from PIL import Image, ImageDraw, ImageFont
 
 from pdf_cmap_fix.cache import MappingCache, validate_unicode_text
-from pdf_cmap_fix.fonts import MUPDF_XREF_ERRORS, PageFontIndex
+from pdf_cmap_fix.fonts import MUPDF_XREF_ERRORS, PageFontIndex, is_standard_cjk_ordering
 from pdf_cmap_fix.ocr import (
     OCRAuthError,
     OCRBackendError,
@@ -280,11 +280,16 @@ def _index_renderable_glyphs(
             doc = fitz.open(pdf_path)
             try:
                 # Strip ToUnicode on disposable doc BEFORE any TextPage is built so we read raw CIDs
+                # Skip standard Adobe-GB1/CNS1/Japan1/Korea1 fonts (MuPDF decodes them to Unicode, not raw Identity CIDs)
+                std_cjk_xrefs: set[int] = set()
                 for page in doc:
                     for fi in page.get_fonts(full=True):
                         fx = int(fi[0])
                         try:
                             if doc.xref_get_key(fx, "Subtype") == ("name", "/Type0"):
+                                if is_standard_cjk_ordering(doc, fx):
+                                    std_cjk_xrefs.add(fx)
+                                    continue
                                 enc_k, enc_v = doc.xref_get_key(fx, "Encoding")
                                 if enc_k == "name" and enc_v == "/Identity-H":
                                     doc.xref_set_key(fx, "ToUnicode", "null")
@@ -309,7 +314,7 @@ def _index_renderable_glyphs(
                                 if not cids:
                                     continue
                                 fx, _, simp = font_index.resolve(span.get("font", ""), sample_cids=cids)
-                                if fx is None:
+                                if fx is None or fx in std_cjk_xrefs:
                                     continue
                                 for cid in cids:
                                     key = (simp, cid)

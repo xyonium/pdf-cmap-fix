@@ -14,6 +14,9 @@ _BASEFONT_RE = re.compile(r"/BaseFont\s+/([^\s/<>\[\]()]+)")
 _XREF_REF_RE = re.compile(r"(\d+)\s+0\s+R")
 _W_TOKEN_RE = re.compile(r"\[|\]|-?\d+(?:\.\d+)?")
 _SUBSET_PREFIX_RE = re.compile(r"^[A-Z]{6}\+")
+_REGISTRY_RE = re.compile(r"/Registry\s*\(([^)]+)\)")
+_ORDERING_RE = re.compile(r"/Ordering\s*\(([^)]+)\)")
+_STANDARD_ADOBE_ORDERINGS = frozenset({"GB1", "CNS1", "Japan1", "Korea1"})
 
 _FZ_ERROR_BASE = getattr(getattr(fitz, "mupdf", None), "FzErrorBase", RuntimeError)
 MUPDF_XREF_ERRORS: tuple[type[BaseException], ...] = (RuntimeError, _FZ_ERROR_BASE)
@@ -230,6 +233,21 @@ def is_subset_renumbered_font(doc: fitz.Document, font_xref: int) -> bool:
     """Return True when the font uses a stream `/CIDToGIDMap` (typically subset-renumbered TTF)."""
     info = get_descendant_font_info(doc, font_xref)
     return info.subtype == "CIDFontType2" and info.cid_to_gid_map_is_stream
+
+
+def is_standard_cjk_ordering(doc: fitz.Document, font_xref: int) -> bool:
+    """Return True if the font's DescendantFont uses a standard Adobe CJK character collection
+    (Adobe-GB1, Adobe-CNS1, Adobe-Japan1, Adobe-Korea1) that PDF viewers already map natively
+    without needing a custom ToUnicode CMap (Adobe TN #5411 §1.2).
+    """
+    info = get_descendant_font_info(doc, font_xref)
+    if not info.cid_system_info:
+        return False
+    reg_m = _REGISTRY_RE.search(info.cid_system_info)
+    ord_m = _ORDERING_RE.search(info.cid_system_info)
+    if not reg_m or not ord_m:
+        return False
+    return reg_m.group(1).strip() == "Adobe" and ord_m.group(1).strip() in _STANDARD_ADOBE_ORDERINGS
 
 
 @dataclass

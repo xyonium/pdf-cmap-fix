@@ -147,3 +147,33 @@ def test_page_font_index_disambiguates_by_w_cids_when_narrow_cids_distinguish():
     assert xref is not None
     assert "AAAAAA+" in full
     assert simp == "SourceHanSansCN"
+
+
+def test_is_standard_cjk_ordering_distinguishes_gb1_from_identity():
+    from pdf_cmap_fix.fonts import is_standard_cjk_ordering
+
+    doc = fitz.open()
+    page = doc.new_page()
+
+    def add_font(ordering: str) -> int:
+        desc = doc.get_new_xref()
+        doc.update_object(
+            desc,
+            f"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /SourceHanSerifCN-Regular "
+            f"/CIDSystemInfo << /Registry (Adobe) /Ordering ({ordering}) /Supplement 5 >> /DW 1000 >>",
+        )
+        t0 = doc.get_new_xref()
+        doc.update_object(
+            t0,
+            f"<< /Type /Font /Subtype /Type0 /BaseFont /SourceHanSerifCN-Regular-Identity-H "
+            f"/Encoding /Identity-H /DescendantFonts [ {desc} 0 R ] >>",
+        )
+        return t0
+
+    fx_id = add_font("Identity")
+    fx_gb1 = add_font("GB1")
+    fx_jp1 = add_font("Japan1")
+    assert is_standard_cjk_ordering(doc, fx_id) is False
+    assert is_standard_cjk_ordering(doc, fx_gb1) is True
+    assert is_standard_cjk_ordering(doc, fx_jp1) is True
+    doc.close()

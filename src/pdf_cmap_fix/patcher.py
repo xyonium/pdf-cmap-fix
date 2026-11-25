@@ -27,6 +27,7 @@ from pdf_cmap_fix.detector import _collect_live_type0_fonts, _read_tounicode_str
 from pdf_cmap_fix.fonts import (
     MUPDF_XREF_ERRORS,
     PageFontIndex,
+    is_standard_cjk_ordering,
     is_subset_renumbered_font,
     simplify_basefont,
 )
@@ -222,6 +223,7 @@ def fix_pdf(
     used_cids_by_xref: dict[int, set[int]] = {x: set() for x in target_xrefs}
     blank_cids_by_xref: dict[int, set[int]] = {x: set() for x in target_xrefs}
     existing_tounicode_by_xref: dict[int, dict[int, str]] = {}
+    strip_only_xrefs: set[int] = set()
     isolated_xrefs: set[int] = set()
     probe_per_xref_families: set[str] = set()
     render_jobs: list[_RenderOCRJob] = []
@@ -232,6 +234,13 @@ def fix_pdf(
     family_target_counts: Counter[str] = Counter(font_meta[fx][1] for fx in target_xrefs)
 
     with SyntheticReplayRenderer(src) as renderer:
+        # Standard Adobe-GB1/CNS1/Japan1/Korea1 fonts map natively; if flagged (e.g. broken legacy ToUnicode),
+        # simply strip the broken /ToUnicode key instead of OCRing or mixing into Adobe-Identity-0 cache!
+        for fx in list(target_xrefs):
+            if is_standard_cjk_ordering(renderer.doc, fx):
+                strip_only_xrefs.add(fx)
+                target_xrefs.remove(fx)
+
         # Preserve existing valid ToUnicode mappings when NOT --force so partial repairs never lose valid entries
         if not opts.force:
             for fx in target_xrefs:
@@ -653,7 +662,7 @@ def fix_pdf(
             warnings=warnings,
         )
 
-    if not per_xref_final_maps:
+    if not per_xref_final_maps and not strip_only_xrefs:
         return FixSummary(
             status="failed",
             pdf_path=str(src),
@@ -671,6 +680,17 @@ def fix_pdf(
     stream_xref_by_sha: dict[str, int] = {}
     patched_fonts = 0
     try:
+        # Remove broken legacy /ToUnicode from standard Adobe-GB1/CNS1/Japan1/Korea1 fonts
+        for fx in sorted(strip_only_xrefs):
+            try:
+                obj = out_doc.xref_object(fx)
+                if "/ToUnicode" in obj:
+                    cleaned = "\n".join(ln for ln in obj.splitlines() if "/ToUnicode" not in ln)
+                    out_doc.update_object(fx, cleaned)
+                    patched_fonts += 1
+            except MUPDF_XREF_ERRORS:
+                pass
+
         for fx, fmap in sorted(per_xref_final_maps.items()):
             _, simp, _ = font_meta[fx]
             cmap_name = sanitize_cmap_name(f"Adobe-Identity-UCS-{simp}")

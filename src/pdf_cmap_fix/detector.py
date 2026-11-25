@@ -15,6 +15,7 @@ from pdf_cmap_fix.fonts import (
     MUPDF_XREF_ERRORS,
     PageFontIndex,
     extract_basefont_from_xref_obj,
+    is_standard_cjk_ordering,
     simplify_basefont,
 )
 
@@ -234,8 +235,12 @@ def inspect_pdf(
 
         for xref, (bf, enc) in sorted(identity_fonts.items()):
             simp = simplify_basefont(bf)
+            std_cjk = is_standard_cjk_ordering(doc, xref)
             status, cmap_text = _read_tounicode_stream(doc, xref)
             if status == "missing":
+                if std_cjk:
+                    # Standard Adobe-GB1/CNS1/Japan1/Korea1 maps natively without ToUnicode
+                    continue
                 missing_or_invalid_xrefs.add(xref)
                 problem_fonts.append(
                     FontIssue(xref=xref, basefont=bf, simplified_name=simp, encoding=enc, reason="missing")
@@ -258,7 +263,6 @@ def inspect_pdf(
 
             # Check for fatal Adobe Reader CMap violations (deduplicated per stream content)
             h = hash(cmap_text)
-            fatal_errs: list[str] = []
             all_errs = validate_tounicode_cmap(cmap_text)
             fatal_errs = [e for e in all_errs if any(m in e for m in _FATAL_CMAP_MARKERS)]
             if fatal_errs and h not in seen_stream_hashes:
@@ -278,6 +282,10 @@ def inspect_pdf(
                         cmap_errors=fatal_errs,
                     )
                 )
+                continue
+
+            if std_cjk:
+                # Standard Adobe CJK ordering with valid ToUnicode does not need raw-CID coverage scan
                 continue
 
             parsed_cmaps[xref] = parsed
