@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+.env
+.env.*
+*.pdf
+debug_*/
+extracted_images/
+.DS_Store
+Thumbs.db
+*:Zone.Identifier

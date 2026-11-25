@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pdf-cmap-fix"
+version = "0.1.0"
+description = "Detect and repair PDFs with missing or broken ToUnicode CMaps using embedded-font synthetic vector replay and OpenAI-compatible vision OCR."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "xyonium" },
+]
+keywords = ["pdf", "tounicode", "cmap", "ocr", "pymupdf", "fonts", "cjk"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "pymupdf>=1.24,<1.26",
+    "Pillow>=10.0.0",
+    "openai>=1.30.0",
+]
+
+[project.optional-dependencies]
+tesseract = ["pytesseract>=0.3.10"]
+dev = ["pytest>=8.0.0"]
+
+[project.scripts]
+pdf-cmap-fix = "pdf_cmap_fix.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pdf_cmap_fix"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
