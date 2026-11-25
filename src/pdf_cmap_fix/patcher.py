@@ -244,7 +244,7 @@ def fix_pdf(
         # Preserve existing valid ToUnicode mappings when NOT --force so partial repairs never lose valid entries
         if not opts.force:
             for fx in target_xrefs:
-                status_tu, cmap_txt = _read_tounicode_stream(renderer.doc, fx)
+                status_tu, cmap_txt, _ = _read_tounicode_stream(renderer.doc, fx)
                 if status_tu == "present" and cmap_txt:
                     parsed_existing = parse_tounicode_cmap(cmap_txt)
                     if parsed_existing:

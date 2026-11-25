@@ -99,25 +99,25 @@ def _safe_get_obj(doc: fitz.Document, xref: int) -> str:
         return ""
 
 
-def _read_tounicode_stream(doc: fitz.Document, font_xref: int) -> tuple[str, str | None]:
-    """Return `(status, cmap_text)` where status is 'missing', 'invalid', or 'present'."""
+def _read_tounicode_stream(doc: fitz.Document, font_xref: int) -> tuple[str, str | None, int | None]:
+    """Return `(status, cmap_text, stream_xref)` where status is 'missing', 'invalid', or 'present'."""
     kind, val = _safe_get_key(doc, font_xref, "ToUnicode")
     if kind in ("none", "null") or val == "null":
-        return ("missing", None)
+        return ("missing", None, None)
     if kind != "xref":
-        return ("invalid", None)
+        return ("invalid", None, None)
     m = _XREF_REF_RE.search(val)
     if not m:
-        return ("invalid", None)
+        return ("invalid", None, None)
     tu_xref = int(m.group(1))
     try:
         raw = doc.xref_stream(tu_xref)
     except MUPDF_XREF_ERRORS:
-        return ("invalid", None)
+        return ("invalid", None, tu_xref)
     if not raw:
-        return ("invalid", None)
+        return ("invalid", None, tu_xref)
     text = raw.decode("latin-1", errors="replace")
-    return ("present", text)
+    return ("present", text, tu_xref)
 
 
 def _compute_text_anomaly_ratio(doc: fitz.Document, max_pages: int = 20) -> float:
@@ -232,11 +232,13 @@ def inspect_pdf(
         present_xrefs: set[int] = set()
         missing_or_invalid_xrefs: set[int] = set()
         seen_stream_hashes: set[int] = set()
+        # Memoize CMap parse & validation per shared ToUnicode stream xref (100x+ speedup on shared CMaps)
+        stream_cache: dict[int, tuple[dict[int, str], list[str], int]] = {}
 
         for xref, (bf, enc) in sorted(identity_fonts.items()):
             simp = simplify_basefont(bf)
             std_cjk = is_standard_cjk_ordering(doc, xref)
-            status, cmap_text = _read_tounicode_stream(doc, xref)
+            status, cmap_text, tu_xref = _read_tounicode_stream(doc, xref)
             if status == "missing":
                 if std_cjk:
                     # Standard Adobe-GB1/CNS1/Japan1/Korea1 maps natively without ToUnicode
@@ -253,7 +255,16 @@ def inspect_pdf(
                 )
                 continue
 
-            parsed = parse_tounicode_cmap(cmap_text)
+            if tu_xref is not None and tu_xref in stream_cache:
+                parsed, fatal_errs, h = stream_cache[tu_xref]
+            else:
+                parsed = parse_tounicode_cmap(cmap_text)
+                h = hash(cmap_text)
+                all_errs = validate_tounicode_cmap(cmap_text) if parsed else []
+                fatal_errs = [e for e in all_errs if any(m in e for m in _FATAL_CMAP_MARKERS)]
+                if tu_xref is not None:
+                    stream_cache[tu_xref] = (parsed, fatal_errs, h)
+
             if not parsed:
                 missing_or_invalid_xrefs.add(xref)
                 problem_fonts.append(
@@ -261,10 +272,6 @@ def inspect_pdf(
                 )
                 continue
 
-            # Check for fatal Adobe Reader CMap violations (deduplicated per stream content)
-            h = hash(cmap_text)
-            all_errs = validate_tounicode_cmap(cmap_text)
-            fatal_errs = [e for e in all_errs if any(m in e for m in _FATAL_CMAP_MARKERS)]
             if fatal_errs and h not in seen_stream_hashes:
                 seen_stream_hashes.add(h)
                 for e in fatal_errs[:5]:
