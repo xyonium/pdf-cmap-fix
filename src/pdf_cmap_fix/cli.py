@@ -122,6 +122,8 @@ def _cmd_fix(args: argparse.Namespace) -> int:
         model=args.model,
         concurrency=args.concurrency,
         max_retries=args.max_retries,
+        timeout=args.timeout,
+        no_thinking=args.no_thinking,
         tesseract_lang=args.tesseract_lang,
         tesseract_cmd=args.tesseract_cmd,
     )
@@ -311,6 +313,8 @@ def _cmd_cache(args: argparse.Namespace) -> int:
             model=args.model,
             concurrency=args.concurrency,
             max_retries=args.max_retries,
+            timeout=args.timeout,
+            no_thinking=args.no_thinking,
         )
         referee_cfg = None
         if args.referee_model:
@@ -320,6 +324,8 @@ def _cmd_cache(args: argparse.Namespace) -> int:
                 model=args.referee_model,
                 concurrency=args.concurrency,
                 max_retries=args.max_retries,
+                timeout=args.timeout,
+                no_thinking=args.no_thinking,
             )
 
         opts = VerifyOptions(
@@ -411,6 +417,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_fix.add_argument("--max-jobs-per-cid", type=int, default=3, help="Max OCR calls per unstabilized CID in a single run (default: 3; 0 = unlimited)")
     p_fix.add_argument("--concurrency", type=int, default=4, help="Concurrent OCR API requests (default: 4)")
     p_fix.add_argument("--max-retries", type=int, default=6, help="Max retries per OCR call (default: 6)")
+    p_fix.add_argument("--timeout", type=float, default=90.0, help="Per-request API timeout in seconds (default: 90)")
+    p_fix.add_argument("--no-thinking", action="store_true", help="Disable reasoning/thinking mode (extra_body enable_thinking=false) for faster, cheaper OCR")
     p_fix.add_argument("--ocr", choices=["openai", "tesseract"], default="openai", help="OCR backend (default: openai)")
     p_fix.add_argument("--api-key", help="OCR API key (overrides PDF_CMAP_API_KEY / DASHSCOPE_API_KEY / OPENAI_API_KEY)")
     p_fix.add_argument("--base-url", help="OpenAI-compatible base URL (overrides PDF_CMAP_BASE_URL / OPENAI_BASE_URL)")
@@ -490,6 +498,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pc_ver.add_argument("--concurrency", type=int, default=4, help="Concurrent VLM sheet requests (default: 4)")
     pc_ver.add_argument("--max-retries", type=int, default=6)
+    pc_ver.add_argument("--timeout", type=float, default=90.0, help="Per-request API timeout in seconds (default: 90)")
+    pc_ver.add_argument("--no-thinking", action="store_true", help="Disable reasoning/thinking mode (extra_body enable_thinking=false) for faster, cheaper verification")
     pc_ver.add_argument("--max-sheets", type=int, default=0, help="Cap number of Stage 1 sheets (0 = unlimited)")
     pc_ver.add_argument("--api-key", help="Primary VLM API key (or PDF_CMAP_API_KEY / DASHSCOPE_API_KEY)")
     pc_ver.add_argument("--base-url", help="Primary VLM base URL")

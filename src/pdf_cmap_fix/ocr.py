@@ -46,7 +46,8 @@ class OCRConfig:
     model: str | None = None
     concurrency: int = 4
     max_retries: int = 6
-    timeout: float = 60.0
+    timeout: float = 90.0
+    no_thinking: bool = False
     tesseract_lang: str = "chi_sim+eng"
     tesseract_cmd: str | None = None
 
@@ -59,7 +60,8 @@ def resolve_ocr_config(
     model: str | None = None,
     concurrency: int = 4,
     max_retries: int = 6,
-    timeout: float = 60.0,
+    timeout: float = 90.0,
+    no_thinking: bool = False,
     tesseract_lang: str = "chi_sim+eng",
     tesseract_cmd: str | None = None,
 ) -> OCRConfig:
@@ -85,6 +87,7 @@ def resolve_ocr_config(
         concurrency=max(1, concurrency),
         max_retries=max(1, max_retries),
         timeout=timeout,
+        no_thinking=no_thinking,
         tesseract_lang=tesseract_lang,
         tesseract_cmd=tesseract_cmd,
     )
@@ -413,10 +416,10 @@ class OpenAIVisionOCR:
 
         for attempt in range(self.config.max_retries):
             try:
-                completion = self._client.chat.completions.create(
-                    model=self.config.model,
-                    temperature=0,
-                    messages=[
+                req_kwargs: dict[str, Any] = {
+                    "model": self.config.model,
+                    "temperature": 0,
+                    "messages": [
                         {
                             "role": "user",
                             "content": [
@@ -428,7 +431,10 @@ class OpenAIVisionOCR:
                             ],
                         }
                     ],
-                )
+                }
+                if self.config.no_thinking:
+                    req_kwargs["extra_body"] = {"enable_thinking": False}
+                completion = self._client.chat.completions.create(**req_kwargs)
                 if completion.choices and completion.choices[0].message.content is not None:
                     return _clean_ocr_response(str(completion.choices[0].message.content))
                 return ""

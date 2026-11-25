@@ -581,6 +581,8 @@ def verify_cache_with_pdfs(
                 for fut in as_completed(fut_to_ref):
                     r_idx, batch = fut_to_ref[fut]
                     summary.referee_sheets_processed += 1
+                    if opts.verbose:
+                        print(f"  [referee {summary.referee_sheets_processed}/{len(ref_jobs)}] processed {len(batch)} glyph(s)", file=sys.stderr)
                     try:
                         raw_out = fut.result()
                     except OCRAuthError as exc:
