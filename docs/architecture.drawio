@@ -1,0 +1,55 @@
+<mxfile host="app.diagrams.net" agent="pdf-cmap-fix" version="24.7.0" type="device">
+  <diagram id="pdf-cmap-fix-arch" name="architecture">
+    <mxGraphModel dx="1220" dy="576" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1220" pageHeight="576" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="input" value="&lt;b&gt;Input Vector PDF&lt;/b&gt;&lt;br/&gt;Type0 / Identity-H·V&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;Missing or broken CMap&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f2fe;strokeColor=#0284c7;strokeWidth=2;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="28" y="122" width="148" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="detector" value="&lt;b&gt;1 · detector.py (check)&lt;/b&gt;&lt;br/&gt;• Scan live Type0 font xrefs&lt;br/&gt;• Verify actual CID coverage&lt;br/&gt;• Audit Adobe TN #5411 rules&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;Skip native Adobe-GB1/CNS1/JP1&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fef9c3;strokeColor=#ca8a04;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="218" y="106" width="198" height="116" as="geometry" />
+        </mxCell>
+        <mxCell id="healthy" value="&lt;b&gt;Exit 0 — Healthy PDF&lt;/b&gt;&lt;br/&gt;Instant skip (~5ms / issue)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;strokeWidth=2;fontColor=#166534;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="218" y="266" width="198" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="grpRender" value="2 · Two-Tier Span Renderer (renderer.py)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;dashed=1;verticalAlign=top;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="462" y="76" width="276" height="248" as="geometry" />
+        </mxCell>
+        <mxCell id="synth" value="&lt;b&gt;Synthetic Vector Replay (Primary)&lt;/b&gt;&lt;br/&gt;Replays PDF's own embedded font_xref&lt;br/&gt;on O(1) white scratch page @ 48pt/144dpi&lt;br/&gt;&lt;code&gt;[&amp;lt;9F71&amp;gt; -500 &amp;lt;3F77&amp;gt;] TJ&lt;/code&gt;&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;Zero bbox offset · Zero 90° rotation fail&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#2563eb;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="478" y="106" width="244" height="114" as="geometry" />
+        </mxCell>
+        <mxCell id="clipfb" value="&lt;b&gt;rawdict Page-Clip (Fallback)&lt;/b&gt;&lt;br/&gt;Pre-padded char bbox union + wmode&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;Only for non-Identity-H / ambiguous xrefs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#64748b;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="478" y="234" width="244" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="grpCache" value="3 · v2 Frequency Cache &amp; 2-Model Contact-Sheet Verifier" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;dashed=1;verticalAlign=top;align=right;spacingRight=12;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="462" y="382" width="464" height="168" as="geometry" />
+        </mxCell>
+        <mxCell id="cache" value="&lt;b&gt;cache.py (v2 JSON)&lt;/b&gt;&lt;br/&gt;UTF-8 string count dictionary&lt;br/&gt;BMP · Surrogates · fi/ffi ligatures&lt;br/&gt;Per-xref subset conflict guard&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;Preset: 8,335 SourceHan CIDs (8,308 locked)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e8ff;strokeColor=#9333ea;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="478" y="412" width="208" height="124" as="geometry" />
+        </mxCell>
+        <mxCell id="verifier" value="&lt;b&gt;verifier.py (cache verify)&lt;/b&gt;&lt;br/&gt;10×10 baseline-kept glyph grid&lt;br/&gt;Stage 1: Blind VLM read&lt;br/&gt;Stage 2: 5×5 Referee VLM&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;Unanimous → auto-fix &amp; locked=true&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fae8ff;strokeColor=#c026d3;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="716" y="412" width="194" height="124" as="geometry" />
+        </mxCell>
+        <mxCell id="ocr" value="&lt;b&gt;4 · ocr.py (On-Demand)&lt;/b&gt;&lt;br/&gt;• OpenAI-compatible VLM&lt;br/&gt;  (Qwen / Kimi / GPT / local)&lt;br/&gt;• Anchor + ligature DP align&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;--no-thinking: 4x faster, 50% tok&lt;br/&gt;Per-CID budget cap (default 3)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffedd5;strokeColor=#ea580c;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="786" y="106" width="188" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="patcher" value="&lt;b&gt;5 · cmap.py &amp; patcher.py&lt;/b&gt;&lt;br/&gt;• Pure bfchar / split bfrange&lt;br/&gt;• Adobe-Identity-UCS header&lt;br/&gt;• SHA-256 shared stream xref&lt;br/&gt;• Clean xref rebuild + deflate&lt;br/&gt;&lt;font color=&quot;#64748b&quot;&gt;Strict Adobe compliant · Zero bloat&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dcfce7;strokeColor=#16a34a;strokeWidth=2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="970" y="264" width="222" height="132" as="geometry" />
+        </mxCell>
+        <mxCell id="output" value="&lt;b&gt;Repaired Vector PDF&lt;/b&gt;&lt;br/&gt;Copy-paste · Search · RAG ready&lt;br/&gt;&lt;font color=&quot;#15803d&quot;&gt;Adobe Reader · Chrome · macOS Preview&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbf7d0;strokeColor=#15803d;strokeWidth=2;fontColor=#14532d;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="970" y="446" width="222" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#475569;strokeWidth=2;" edge="1" parent="1" source="input" target="detector"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" value="All valid" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#16a34a;strokeWidth=2;fontColor=#15803d;fontStyle=1;" edge="1" parent="1" source="detector" target="healthy"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" value="Exit 2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#2563eb;strokeWidth=2;fontColor=#1d4ed8;fontStyle=1;" edge="1" parent="1" source="detector" target="synth"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" value="Unseen CID" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#475569;strokeWidth=2;fontStyle=1;" edge="1" parent="1" source="synth" target="ocr"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="99% Cache Hit" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9333ea;strokeWidth=2;dashed=1;fontColor=#7e22ce;fontStyle=1;" edge="1" parent="1" source="cache" target="grpRender"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="Update observations" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#475569;strokeWidth=2;fontStyle=1;" edge="1" parent="1" source="ocr" target="cache"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9333ea;strokeWidth=2;dashed=1;" edge="1" parent="1" source="verifier" target="cache"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" value="Resolved map" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#16a34a;strokeWidth=2;fontColor=#15803d;fontStyle=1;" edge="1" parent="1" source="cache" target="patcher"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#16a34a;strokeWidth=2;" edge="1" parent="1" source="patcher" target="output"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

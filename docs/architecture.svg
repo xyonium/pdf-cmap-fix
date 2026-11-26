@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 576" font-family="'Segoe UI','PingFang SC','Microsoft YaHei','Helvetica Neue',Arial,sans-serif" font-size="12">
+  <!-- Outer White Canvas -->
+  <rect x="8" y="8" width="1204" height="560" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="610" y="36" text-anchor="middle" font-size="16" font-weight="700" fill="#0f172a">pdf-cmap-fix — Surgical ToUnicode CMap Reconstruction &amp; Visual Verification Pipeline</text>
+  <text x="610" y="55" text-anchor="middle" font-size="11.5" fill="#475569">Preserves 100% vector glyphs &amp; layout · Fixes Adobe Reader paste bugs · 99% cache hit rate on recurring publications</text>
+
+  <!-- Step 1: Input PDF -->
+  <rect x="28" y="122" width="148" height="84" rx="8" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.6"/>
+  <text x="102" y="148" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">Input Vector PDF</text>
+  <text x="102" y="168" text-anchor="middle" font-size="11" fill="#334155">Type0 / Identity-H·V</text>
+  <text x="102" y="186" text-anchor="middle" font-size="10" fill="#64748b">Missing or broken CMap</text>
+
+  <!-- Step 1: detector.py -->
+  <rect x="218" y="106" width="198" height="116" rx="8" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.6"/>
+  <rect x="228" y="114" width="22" height="16" rx="4" fill="#ca8a04"/>
+  <text x="239" y="126" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">1</text>
+  <text x="326" y="127" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">detector.py (check)</text>
+  <text x="317" y="149" text-anchor="middle" font-size="11" fill="#334155">• Scan live Type0 font xrefs</text>
+  <text x="317" y="167" text-anchor="middle" font-size="11" fill="#334155">• Verify actual CID coverage</text>
+  <text x="317" y="185" text-anchor="middle" font-size="11" fill="#334155">• Audit Adobe TN #5411 rules</text>
+  <text x="317" y="205" text-anchor="middle" font-size="10" fill="#64748b">Skip native Adobe-GB1/CNS1/JP1</text>
+
+  <!-- Healthy Fast Exit -->
+  <rect x="218" y="266" width="198" height="60" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.6"/>
+  <text x="317" y="291" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Exit 0 — Healthy PDF</text>
+  <text x="317" y="311" text-anchor="middle" font-size="11" fill="#15803d">Instant skip (~5ms / issue)</text>
+
+  <!-- Step 2: Renderer Group -->
+  <rect x="462" y="76" width="276" height="248" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="600" y="95" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">2 · Two-Tier Span Renderer (renderer.py)</text>
+
+  <rect x="478" y="106" width="244" height="114" rx="8" fill="#dbeafe" stroke="#2563eb" stroke-width="1.6"/>
+  <text x="600" y="128" text-anchor="middle" font-size="13" font-weight="700" fill="#1e40af">Synthetic Vector Replay (Primary)</text>
+  <text x="600" y="148" text-anchor="middle" font-size="11" fill="#334155">Replays PDF's own embedded font_xref</text>
+  <text x="600" y="166" text-anchor="middle" font-size="11" fill="#334155">on O(1) white scratch page @ 48pt/144dpi</text>
+  <text x="600" y="185" text-anchor="middle" font-size="11" font-family="monospace" fill="#0f172a">[&lt;9F71&gt; -500 &lt;3F77&gt;] TJ</text>
+  <text x="600" y="205" text-anchor="middle" font-size="10" fill="#64748b">Zero bbox offset · Zero 90° rotation fail</text>
+
+  <rect x="478" y="234" width="244" height="76" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="1.6"/>
+  <text x="600" y="256" text-anchor="middle" font-size="12.5" font-weight="700" fill="#0f172a">rawdict Page-Clip (Fallback)</text>
+  <text x="600" y="275" text-anchor="middle" font-size="11" fill="#334155">Pre-padded char bbox union + wmode</text>
+  <text x="600" y="294" text-anchor="middle" font-size="10" fill="#64748b">Only for non-Identity-H / ambiguous xrefs</text>
+
+  <!-- Step 3: Cache & Verifier Group -->
+  <rect x="462" y="388" width="464" height="170" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="694" y="549" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">3 · v2 Frequency Cache &amp; 2-Model Contact-Sheet Verifier</text>
+
+  <rect x="478" y="412" width="208" height="124" rx="8" fill="#f3e8ff" stroke="#9333ea" stroke-width="1.6"/>
+  <text x="582" y="434" text-anchor="middle" font-size="13" font-weight="700" fill="#6b21a8">cache.py (v2 JSON)</text>
+  <text x="582" y="454" text-anchor="middle" font-size="11" fill="#334155">UTF-8 string count dictionary</text>
+  <text x="582" y="472" text-anchor="middle" font-size="11" fill="#334155">BMP · Surrogates · fi/ffi ligatures</text>
+  <text x="582" y="490" text-anchor="middle" font-size="11" fill="#334155">Per-xref subset conflict guard</text>
+  <text x="582" y="511" text-anchor="middle" font-size="10" fill="#64748b">Preset: 8,335 SourceHan CIDs</text>
+  <text x="582" y="526" text-anchor="middle" font-size="10" fill="#64748b">(8,308 visually locked)</text>
+
+  <rect x="716" y="412" width="194" height="124" rx="8" fill="#fae8ff" stroke="#c026d3" stroke-width="1.6"/>
+  <text x="813" y="434" text-anchor="middle" font-size="13" font-weight="700" fill="#86198f">verifier.py (cache verify)</text>
+  <text x="813" y="454" text-anchor="middle" font-size="11" fill="#334155">10×10 baseline-kept glyph grid</text>
+  <text x="813" y="472" text-anchor="middle" font-size="11" fill="#334155">Stage 1: Blind VLM read</text>
+  <text x="813" y="490" text-anchor="middle" font-size="11" fill="#334155">Stage 2: 5×5 Referee VLM</text>
+  <text x="813" y="511" text-anchor="middle" font-size="10" fill="#64748b">Unanimous agreement →</text>
+  <text x="813" y="526" text-anchor="middle" font-size="10" fill="#64748b">auto-fix &amp; locked = true</text>
+
+  <!-- Step 4: OCR Engine -->
+  <rect x="786" y="106" width="188" height="130" rx="8" fill="#ffedd5" stroke="#ea580c" stroke-width="1.6"/>
+  <rect x="796" y="114" width="22" height="16" rx="4" fill="#ea580c"/>
+  <text x="807" y="126" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">4</text>
+  <text x="888" y="127" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">ocr.py (On-Demand)</text>
+  <text x="880" y="149" text-anchor="middle" font-size="11" fill="#334155">• OpenAI-compatible VLM</text>
+  <text x="880" y="167" text-anchor="middle" font-size="11" fill="#334155">  (Qwen / Kimi / GPT / local)</text>
+  <text x="880" y="185" text-anchor="middle" font-size="11" fill="#334155">• Anchor + ligature DP align</text>
+  <text x="880" y="205" text-anchor="middle" font-size="10" fill="#64748b">--no-thinking: 4x faster, 50% tok</text>
+  <text x="880" y="221" text-anchor="middle" font-size="10" fill="#64748b">Per-CID budget cap (default 3)</text>
+
+  <!-- Step 5: CMap Generator & Patcher -->
+  <rect x="970" y="264" width="222" height="132" rx="8" fill="#dcfce7" stroke="#16a34a" stroke-width="1.6"/>
+  <rect x="980" y="272" width="22" height="16" rx="4" fill="#16a34a"/>
+  <text x="991" y="284" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">5</text>
+  <text x="1088" y="285" text-anchor="middle" font-size="13" font-weight="700" fill="#0f172a">cmap.py &amp; patcher.py</text>
+  <text x="1081" y="307" text-anchor="middle" font-size="11" fill="#334155">• Pure bfchar / split bfrange</text>
+  <text x="1081" y="325" text-anchor="middle" font-size="11" fill="#334155">• Adobe-Identity-UCS header</text>
+  <text x="1081" y="343" text-anchor="middle" font-size="11" fill="#334155">• SHA-256 shared stream xref</text>
+  <text x="1081" y="361" text-anchor="middle" font-size="11" fill="#334155">• Clean xref rebuild + deflate</text>
+  <text x="1081" y="381" text-anchor="middle" font-size="10" fill="#64748b">Strict Adobe compliant · Zero bloat</text>
+
+  <!-- Output PDF -->
+  <rect x="970" y="446" width="222" height="90" rx="8" fill="#bbf7d0" stroke="#15803d" stroke-width="1.6"/>
+  <text x="1081" y="473" text-anchor="middle" font-size="13" font-weight="700" fill="#14532d">Repaired Vector PDF</text>
+  <text x="1081" y="493" text-anchor="middle" font-size="11" fill="#166534">Copy-paste · Search · RAG ready</text>
+  <text x="1081" y="513" text-anchor="middle" font-size="10" fill="#15803d">Adobe Reader · Chrome · macOS Preview</text>
+
+  <!-- Orthogonal edges with explicit polygon arrowheads (100% SVG 1.1 & SVG 2 universal) -->
+  <!-- Input -> detector -->
+  <path d="M176,164 L212,164" fill="none" stroke="#475569" stroke-width="1.8"/>
+  <polygon points="218,164 210,159 210,169" fill="#475569"/>
+
+  <!-- detector -> Exit 0 -->
+  <path d="M317,222 L317,260" fill="none" stroke="#16a34a" stroke-width="2.0"/>
+  <polygon points="317,266 312,258 322,258" fill="#16a34a"/>
+  <text x="352" y="247" text-anchor="middle" font-size="10.5" font-weight="600" fill="#15803d">All valid</text>
+
+  <!-- detector -> Renderer -->
+  <path d="M416,164 L472,164" fill="none" stroke="#2563eb" stroke-width="2.0"/>
+  <polygon points="478,164 470,159 470,169" fill="#2563eb"/>
+  <text x="446" y="154" text-anchor="middle" font-size="10.5" font-weight="600" fill="#1d4ed8">Exit 2</text>
+
+  <!-- Renderer -> OCR -->
+  <path d="M722,164 L780,164" fill="none" stroke="#475569" stroke-width="1.8"/>
+  <polygon points="786,164 778,159 778,169" fill="#475569"/>
+  <text x="754" y="153" text-anchor="middle" font-size="10" font-weight="600" fill="#1e293b">Unseen CID</text>
+
+  <!-- Cache -> Renderer (99% hit skip) -->
+  <path d="M530,412 L530,330" fill="none" stroke="#9333ea" stroke-width="1.8" stroke-dasharray="5 3"/>
+  <polygon points="530,324 525,332 535,332" fill="#9333ea"/>
+  <text x="486" y="358" text-anchor="middle" font-size="10.5" font-weight="600" fill="#7e22ce">99% Cache Hit</text>
+
+  <!-- OCR -> Cache -->
+  <path d="M880,236 L880,342 L582,342 L582,406" fill="none" stroke="#475569" stroke-width="1.8"/>
+  <polygon points="582,412 577,404 587,404" fill="#475569"/>
+  <text x="730" y="335" text-anchor="middle" font-size="10.5" font-weight="600" fill="#1e293b">Update observations</text>
+
+  <!-- Verifier -> Cache -->
+  <path d="M716,474 L692,474" fill="none" stroke="#9333ea" stroke-width="1.8" stroke-dasharray="4 3"/>
+  <polygon points="686,474 694,469 694,479" fill="#9333ea"/>
+
+  <!-- Cache -> CMap Generator -->
+  <path d="M640,412 L640,362 L944,362 L944,330 L964,330" fill="none" stroke="#16a34a" stroke-width="2.0"/>
+  <polygon points="970,330 962,325 962,335" fill="#16a34a"/>
+  <text x="908" y="354" text-anchor="middle" font-size="10.5" font-weight="600" fill="#15803d">Resolved map</text>
+
+  <!-- CMap Generator -> Output PDF -->
+  <path d="M1081,396 L1081,440" fill="none" stroke="#16a34a" stroke-width="2.0"/>
+  <polygon points="1081,446 1076,438 1086,438" fill="#16a34a"/>
+</svg>

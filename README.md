@@ -80,18 +80,63 @@ uv run pdf-cmap-fix fix ./issues/ -o ./fixed/ \
 
 ---
 
-## 工作原理
+## 工作原理与系统架构
+
+<p align="center">
+  <img src="docs/architecture.svg" alt="pdf-cmap-fix architecture" width="1000">
+</p>
+
+> 📐 **可缩放矢量图与源文件**：[docs/architecture.svg](docs/architecture.svg) · Draw.io 可编辑源文件：[docs/architecture.drawio](docs/architecture.drawio)
 
 ```mermaid
 flowchart LR
-    A[输入 PDF] --> B{detector.py\n覆盖度 + Adobe 规范检测}
-    B -- 退出码 0: 健康 --> C[直接跳过 / 快速提取]
-    B -- 退出码 2: 缺失或违规 --> D[renderer.py\n同文档 font_xref 48pt 白底矢量重放]
-    D --> E{cache.py\nv2 频次与锁定缓存}
-    E -- 已锁定 / 高置信稳定 --> F[cmap.py\nISO 32000-1 纯净 bfchar + SHA-256 流共享]
-    E -- 未见新字 / 低置信 --> G[ocr.py\nOpenAI 兼容 VLM + 锚点/连字对齐]
-    G --> E
-    F --> H[patcher.py\nFlateDecode 压缩 + 悬空 xref 自愈保存]
+    classDef input fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0f172a
+    classDef detect fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#0f172a
+    classDef render fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    classDef fallback fill:#f1f5f9,stroke:#64748b,stroke-width:1.5px,color:#0f172a
+    classDef cache fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#0f172a
+    classDef ocr fill:#ffedd5,stroke:#ea580c,stroke-width:2px,color:#0f172a
+    classDef ok fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+
+    A["<b>输入矢量 PDF</b><br/>Type0 / Identity-H·V<br/>缺失或损坏 ToUnicode"]
+    B{"<b>1 · detector.py</b><br/>覆盖度 + Adobe TN 5411 检测<br/>自动豁免原生 GB1/CNS1/JP1"}
+    C["<b>Exit 0 — 健康跳过</b><br/>~5ms 极速放行"]
+
+    subgraph SG_R["2 · 双层渲染引擎 (renderer.py)"]
+        D["<b>合成白底矢量重放 (主)</b><br/>调用原 PDF 内嵌 font_xref<br/>48pt/144dpi 内存 O(1) 草稿页<br/>TJ 十六进制矢量流重放"]
+        D2["<b>rawdict 字符包络裁剪 (回退)</b><br/>仅非 Identity-H 或同名歧义触发"]
+    end
+
+    subgraph SG_C["3 · v2 频次缓存与双模型网格盲测 (cache.py / verifier.py)"]
+        E["<b>v2 UTF-8 频次与锁定缓存</b><br/>支持 BMP / 代理对 / fi·ffi 连字<br/>跨 xref 子集重编号冲突防护"]
+        V["<b>10×10 保留基线网格盲测</b><br/>主模型盲读 + 5×5 裁判模型复核<br/>内置 8,335 思源已核验预设"]
+    end
+
+    G["<b>4 · ocr.py (按需增量)</b><br/>OpenAI 兼容多模态 VLM<br/>锚点 + 连字 DP 唯一区间对齐<br/>--no-thinking 提速 4 倍"]
+    F["<b>5 · cmap.py + patcher.py</b><br/>纯净 bfchar / 双边界拆段 bfrange<br/>SHA-256 共享流 + 悬空 xref 自愈"]
+    H["<b>修复后矢量 PDF</b><br/>Adobe Reader 零方块 · 零体积膨胀<br/>复制 / 搜索 / RAG 入库就绪"]
+
+    A --> B
+    B -- "全部合规 (Exit 0)" --> C
+    B -- "缺失或违规 (Exit 2)" --> D
+    D -. "特殊编码降级" .-> D2
+    E -. "99% 已锁定直接命中" .-> F
+    D -- "仅 1% 未见新字" --> G
+    D2 -- "未见新字" --> G
+    G -- "更新观测计数" --> E
+    V -. "双模型一致 → auto-fix & lock" .-> E
+    E -- "生成字体映射表" --> F
+    F --> H
+
+    class A input
+    class B detect
+    class C,F,H ok
+    class D render
+    class D2 fallback
+    class E,V cache
+    class G ocr
+    style SG_R fill:#f8fafc,stroke:#94a3b8,stroke-width:1.5px,stroke-dasharray: 5 3,color:#334155
+    style SG_C fill:#faf5ff,stroke:#a855f7,stroke-width:1.5px,stroke-dasharray: 5 3,color:#4c1d95
 ```
 
 ### 为什么「合成白底矢量重放」能根治传统 OCR 偏移与旋转盲区？
@@ -165,6 +210,38 @@ uv run pdf-cmap-fix extract fixed.pdf --json -o output.json
 ## 网格重渲染视觉盲测核验 (`cache verify`)
 
 如果历史缓存是通过统计投票积累的，可能潜伏着形近字错误（如 `余/佘`、`黑/曜`、`入/λ`、`v/ν`）。`pdf-cmap-fix cache verify` 提供了**零确认偏见的双模型视觉盲测核验**：
+
+```mermaid
+flowchart LR
+    classDef grid fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#0f172a
+    classDef vlm1 fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#0f172a
+    classDef vlm2 fill:#fae8ff,stroke:#c026d3,stroke-width:2px,color:#0f172a
+    classDef lock fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+    classDef warn fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+
+    G1["<b>10×10 保留基线编号网格</b><br/>从 PDF 内嵌 font_xref 重渲染<br/>保留句点与间隔号真实高度"]
+    M1{"<b>Stage 1 主模型盲读</b><br/>qwen3.8-max-0902<br/>不看旧缓存答案"}
+    L1["<b>直接锁定 (locked = true)</b><br/>~96% 一次通过"]
+    G2["<b>5×5 高清放大复核网格</b><br/>仅收集 Stage 1 分歧项"]
+    M2{"<b>Stage 2 裁判模型复核</b><br/>kimi-k3.1-pro"}
+    L2["<b>裁判确认原缓存正确</b><br/>标记 locked = true"]
+    L3["<b>主模型 + 裁判模型一致纠错</b><br/>--auto-fix 自动更新并锁定"]
+    RPT["<b>三方分歧保持解锁</b><br/>写入 verify_report.json 供人工裁决"]
+
+    G1 --> M1
+    M1 -- "盲读 == 缓存" --> L1
+    M1 -- "盲读 != 缓存" --> G2
+    G2 --> M2
+    M2 -- "裁判 == 缓存" --> L2
+    M2 -- "裁判 == 主模型" --> L3
+    M2 -- "三方均不一致" --> RPT
+
+    class G1,G2 grid
+    class M1 vlm1
+    class M2 vlm2
+    class L1,L2,L3 lock
+    class RPT warn
+```
 
 1. 从本地 PDF 中定位每个缓存 CID 的真实嵌入矢量字体，**保留真实垂直基线位置**（使 `.` vs `·`、`'` vs `,`、`-` vs `_` 的高低位置一目了然）渲染为 `10×10` 编号网格图；
 2. 主模型（如 `qwen3.8-max-0902`）在**不知道缓存答案**的前提下盲读转写整张网格：完全一致的条目立即标记 `locked: true`；
